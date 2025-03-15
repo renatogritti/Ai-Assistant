@@ -1,0 +1,59 @@
+.chat-container {
+    height: 60vh;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.message {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.user-message {
+    background-color: #007bff;
+    color: white;
+    margin-left: 20%;
+}
+
+.bot-message {
+    background-color: #f8f9fa;
+    margin-right: 20%;
+}
+
+pre {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+code {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9em;
+}
+
+.bot-message pre {
+    background-color: #2d2d2d;
+    color: #f8f9fa;
+}
+
+.bot-message code {
+    color: #f8f9fa;
+}
+
+.bot-message:first-child {
+    background-color: #e3f2fd;
+    border-left: 4px solid #1976d2;
+    font-size: 1.1em;
+    padding: 15px;
+}
+
+em {
+    font-style: italic;
+}
+
+strong {
+    font-weight: bold;
+}
