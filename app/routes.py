@@ -5,10 +5,12 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import re
+import json
+import html
 
 main = Blueprint('main', __name__)
 
-# Configuração de retry para requests
+# Configure retry strategy for requests
 retry_strategy = Retry(
     total=3,
     backoff_factor=1,
@@ -20,78 +22,119 @@ http.mount("http://", adapter)
 http.mount("https://", adapter)
 
 def format_response(text):
-    # Formata blocos de código
-    text = re.sub(r'```(\w+)?\n(.*?)\n```', r'<pre><code class="language-\1">\2</code></pre>', text, flags=re.DOTALL)
-    
-    # Formata texto em negrito
-    text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
-    
-    # Formata texto em itálico
-    text = re.sub(r'\*(.*?)\*', r'<em>\1</em>', text)
-    
-    # Converte quebras de linha em <br>
-    text = text.replace('\n', '<br>')
-    
-    return text
+    """
+    Escape double quotes and backslashes for JSON
+    """
+    return text.replace('\\', '\\\\').replace('"', '\\"')
 
 @main.route('/')
 def index():
-    return render_template('chat.html')
+    welcome_message = {
+        "response": """👋 **Olá! Sou seu assistente AI!**
 
-@main.route('/chat', methods=['POST'])
+*Estou aqui para ajudar com suas perguntas e tarefas.* Posso auxiliar com:
+
+- **Programação**: Explicações, debugging e exemplos de código
+- **Pesquisa**: Encontrar informações e resumir conteúdos
+- **Criatividade**: Gerar ideias e conteúdo criativo
+- **Produtividade**: Dicas e estratégias para otimizar seu trabalho
+
+*Como posso ajudar você hoje?*"""
+    }
+    return render_template('chat.html', welcome_message=json.dumps(welcome_message))
+
+@main.route('/chat')
 def chat():
+    try:
+        message = request.args.get('message')
+        if not message:
+            return jsonify({'error': 'Mensagem não fornecida'}), 400
+        
+        # System prompt with formatting instructions
+        system_prompt = """Instruções de formato e estilo:
+IMPORTANTE - Formatação HTML obrigatória:
+- Use <p> para parágrafos
+- Use <br> para quebras de linha
+- Use <ul> e <li> para listas
+- Use <strong> para negrito
+- Use <em> para itálico
+- Use <a href="url">texto</a> para links
+
+Exemplo de formatação esperada:
+<p>Olá! Aqui está a resposta:</p>
+<p>Este é um parágrafo com <strong>texto em negrito</strong> e <em>itálico</em>.</p>
+<ul>
+<li>Primeiro item da lista</li>
+<li>Segundo item da lista</li>
+</ul>
+
+Instruções gerais:
+- Você é um assistente AI amigável e prestativo
+- Responda sempre em português do Brasil
+- Use frases curtas e diretas
+- Seja preciso, informativo e útil
+"""
+
+        url = "http://localhost:11434/api/generate"
+        
+        payload = {
+            "model": "gemma3:4b",
+            "prompt": f"{system_prompt}\n\nPergunta: {message}\n\n",
+            "stream": True,
+            "temperature": 0.7,
+            "top_k": 40,
+            "top_p": 0.9,
+            "repeat_penalty": 1.1
+        }
+
+        def generate():
+            full_response = ""
+            response = http.post(url, json=payload, stream=True)
+            
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        json_response = json.loads(line)
+                        chunk = json_response.get('response', '')
+                        if chunk.strip():
+                            full_response += chunk
+                            formatted_chunk = format_response(chunk)
+                            yield f'data: {{"response": "{formatted_chunk}"}}\n\n'
+                    except json.JSONDecodeError:
+                        continue
+
+            yield f'data: {{"done": true}}\n\n'
+
+        return current_app.response_class(
+            generate(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Content-Type': 'text/event-stream',
+                'Connection': 'keep-alive'
+            }
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@main.route('/save_chat', methods=['POST'])
+def save_chat():
     try:
         data = request.json
         message = data.get('message')
+        response = data.get('response')
         
-        system_prompt = """Instruções:
-- Voce e Deeply, um assistente especializado em trabalho colaborativo, agilidade empresarial, social kudos e deep work.
-Seu foco e ajudar equipes a trabalharem melhor juntas, reconhecer conquistas e manter a produtividade profunda.
-- Responda sempre em português do Brasil
-- Seja direto e objetivo
-- Use frases curtas
-- Evite introduções desnecessárias
-- Use tópicos quando apropriado
-- Forneça exemplos práticos quando solicitado
-- Foque no essencial"""
+        if message and response:
+            conversation = Conversation(
+                user_message=message,
+                bot_response=response
+            )
+            db.session.add(conversation)
+            db.session.commit()
+            return jsonify({'success': True})
         
-        response = http.post(
-            f"'OLLAMA_API_BASE'/api/generate",
-            json={
-                "model": 'OLLAMA_MODEL',
-                "prompt": f"{system_prompt}\n\nPergunta: {message}",
-                "stream": False,
-                "temperature": 0.5,
-                "top_k": 30,
-                "top_p": 0.8,
-                "repeat_penalty": 1.2
-            },
-            timeout=120
-        )
+        return jsonify({'error': 'Dados inválidos'}), 400
         
-        if response.status_code == 200:
-            response_data = response.json()
-            if 'error' in response_data:
-                return jsonify({'error': 'Erro no modelo: ' + response_data['error']}), 500
-                
-            bot_response = response_data.get('response', '').strip()
-            if not bot_response:
-                return jsonify({'error': 'Resposta vazia do modelo'}), 500
-                
-            formatted_response = format_response(bot_response)
-            
-            try:
-                conversation = Conversation(user_message=message, bot_response=bot_response)
-                db.session.add(conversation)
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
-            
-            return jsonify({'response': formatted_response})
-        else:
-            return jsonify({'error': f"Erro na API: {response.status_code}"}), 500
-            
-    except requests.exceptions.RequestException as e:
-        return jsonify({'error': f"Erro de conexão: {str(e)}"}), 500
     except Exception as e:
-        return jsonify({'error': f"Erro: {str(e)}"}), 500
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

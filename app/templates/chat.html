@@ -1,24 +1,34 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container my-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-dark text-white">
-                    <h3 class="mb-0">Deeply AI Chat</h3>
-                </div>
-                <div class="card-body chat-container" id="chat-messages">
-                    <!-- Mensagens serão inseridas aqui -->
-                </div>
-                <div class="card-footer">
-                    <form id="chat-form" class="d-flex">
-                        <input type="text" id="user-input" class="form-control me-2" placeholder="Digite sua mensagem...">
-                        <button type="submit" class="btn btn-primary">Enviar</button>
-                    </form>
-                </div>
+<div class="container-fluid h-100">
+    <div class="row h-100">
+        <div class="col-12 col-md-10 col-lg-8 mx-auto px-0">
+            <div class="chat-container" id="chat-messages">
+                <!-- Messages will be inserted here -->
+            </div>
+            <div class="input-area position-fixed bottom-0 w-100">
+                <form id="chat-form" class="col-12 col-md-10 col-lg-8 mx-auto">
+                    <div class="input-group">
+                        <textarea id="user-input" class="form-control chat-input" 
+                               placeholder="Digite sua mensagem..." autocomplete="off" rows="1"></textarea>
+                        <button type="submit" class="btn send-button" id="send-button">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-send" viewBox="0 0 16 16">
+                                <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    var welcomeMessageData = {
+        response: "Olá! Sou seu assistente AI!\n\nEstou aqui para ajudar com suas perguntas e tarefas. Posso auxiliar com:\n\n- Programação e desenvolvimento\n- Pesquisa e informações\n- Criatividade e ideias\n- Produtividade e organização\n\nComo posso ajudar você hoje?"
+    };
+</script>
+
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
